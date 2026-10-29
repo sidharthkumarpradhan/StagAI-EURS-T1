@@ -78,6 +78,7 @@ def quantize(rgb):
 def main(model_dir, input_dir, output_dir, device):
     torch.manual_seed(0)
     torch.set_grad_enabled(False)
+    restorers.DEVICE = device
     W, out = Path(model_dir), Path(output_dir)
     images = list_images(Path(input_dir))
     ka = np.load(W / "key_affines.npz")

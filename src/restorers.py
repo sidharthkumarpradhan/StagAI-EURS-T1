@@ -16,6 +16,7 @@ CIN = 17 + 12 * GSTATS          # cubic map 3 + degraded 3 + water one-hot 10 + 
 LEVELS = 4
 NW, NENC, NMID, NDEC = 32, (2, 2, 4, 8), 12, (2, 2, 2, 2)
 UNET_WIDTH = 64
+DEVICE = "cuda"  # set by run.py from its device argument (the submission ran on CUDA)
 
 
 def gstats(deg):
@@ -134,47 +135,47 @@ class GpuInputs:
     def __init__(self, maps, params_path):
         self.keys = sorted(maps)
         self.kid = {k: i for i, k in enumerate(self.keys)}
-        self.A = torch.tensor(np.stack([maps[k] for k in self.keys]), dtype=torch.float32, device="cuda")
+        self.A = torch.tensor(np.stack([maps[k] for k in self.keys]), dtype=torch.float32, device=DEVICE)
         p = rsuigm.load_params(params_path)
         tab = lambda name, k: rsuigm._interp_z(p[name][int(np.clip(k[0], 1, 10)) - 1], p["zs"], k[1])  # noqa: E731
         self.phys = torch.tensor(np.stack([np.concatenate([tab("e", k), tab("Bz", k) / 255.0,
                                                            [p["beta"][int(np.clip(k[0], 1, 10)) - 1]]])
-                                           for k in self.keys]), dtype=torch.float32, device="cuda")  # (K, 7)
+                                           for k in self.keys]), dtype=torch.float32, device=DEVICE)  # (K, 7)
 
     def __call__(self, d, keys, stats):
         """d: (N, 3, H, W) float 0-1; keys: list of (water, depth); stats: (N, 12) tensor."""
         r, g, b = d[:, 0:1], d[:, 1:2], d[:, 2:3]
         feats = torch.cat([d, torch.ones_like(r), d * d, r * g, r * b, g * b, d * d * d], 1)  # = t1_rest_ab.design "cub"
-        A = self.A[torch.tensor([self.kid[k] for k in keys], device="cuda")]  # (N, 13, 3)
+        A = self.A[torch.tensor([self.kid[k] for k in keys], device=DEVICE)]  # (N, 13, 3)
         cub = torch.einsum("nfhw,nfc->nchw", feats, A).clamp(0, 1)
         n, _, h, w = d.shape
-        cond = torch.zeros(n, 23, h, w, device="cuda")
+        cond = torch.zeros(n, 23, h, w, device=DEVICE)
         for j, (wt, dp) in enumerate(keys):
             cond[j, min(max(int(wt), 1), 10) - 1] = 1
             cond[j, 10] = dp / 100.0
         cond[:, 11:] = stats[:, :, None, None]
-        ph = self.phys[torch.tensor([self.kid[k] for k in keys], device="cuda")][:, :, None, None].expand(-1, -1, h, w)
+        ph = self.phys[torch.tensor([self.kid[k] for k in keys], device=DEVICE)][:, :, None, None].expand(-1, -1, h, w)
         return torch.cat([cub, d, cond, ph], 1)
 
 
 def load(path, arch, phys):
-    net = make_net(arch, phys).cuda().eval()
-    net.load_state_dict(torch.load(path, map_location="cuda"))
+    net = make_net(arch, phys).to(DEVICE).eval()
+    net.load_state_dict(torch.load(path, map_location=DEVICE))
     return net, phys
 
 
 @torch.no_grad()
 def run(net, phys, x):
     xi = x if phys else x[:, :CIN]
-    with torch.autocast("cuda", torch.float16):
+    with torch.autocast("cuda", torch.float16, enabled=DEVICE.startswith("cuda")):
         return net(xi).float()
 
 
 def restore_mean(nets, gin, deg, k):
     """Mean of the restorers on one degraded uint8 HxWx3 image with key k; float HxWx3 in 0-1."""
     h, w = deg.shape[:2]
-    d = torch.from_numpy(deg).cuda().permute(2, 0, 1)[None].float() / 255
+    d = torch.from_numpy(deg).to(DEVICE).permute(2, 0, 1)[None].float() / 255
     d = F.pad(d, (0, (-w) % 16, 0, (-h) % 16), mode="reflect")
-    x = gin(d, [k], torch.from_numpy(gstats(deg).astype(np.float32))[None].cuda())
+    x = gin(d, [k], torch.from_numpy(gstats(deg).astype(np.float32))[None].to(DEVICE))
     y = torch.stack([run(n, ph, x)[0, :, :h, :w] for n, ph in nets]).mean(0).clamp(0, 1)
     return y.permute(1, 2, 0).cpu().numpy()

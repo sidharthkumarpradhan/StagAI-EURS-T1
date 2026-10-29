@@ -35,7 +35,8 @@ crops per step re-degraded from the train clean images.
 
 The 20 scenes of `eurs_train.zip` only (4,000 degraded renderings with clean image and mask). No development or
 testing-phase image was used for training, fine-tuning, pseudo-labelling, model selection or calibration; testing
-images are only inputs at inference.
+images are only inputs at inference. Development-phase leaderboard scores guided which recipes we kept. Track 1 had one
+testing-phase submission (19062), so nothing was chosen from testing-phase scores.
 
 **External data and pretrained models.**
 - Segmentation masks from USIS16K, UIIS10K, USIS10K, SUIM and Coralscapes, mapped to the five EURS classes and
