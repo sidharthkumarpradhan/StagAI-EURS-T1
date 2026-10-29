@@ -1,0 +1,5 @@
+team: StagAI
+track: eurs-t1
+submission_id: 19062            # model name 6e2b4bf589d1, testing phase, composite 0.637
+contact: sidharthp@assignall.ai
+hardware: NVIDIA V100 16 GB

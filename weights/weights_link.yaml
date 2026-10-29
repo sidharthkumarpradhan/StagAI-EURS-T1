@@ -1,0 +1,5 @@
+# Track 1 weights of submission 19062: one .tar.gz, unpacked into weights/ as teachers/<15 runs>/{config.json,best.pt},
+# restorers/{rnS4all,rnT2all,rnT5all}.pt, restorers/{rest_maps.npy,rsuigm_params.npz}, key_affines.npz.
+url: https://github.com/sidharthkumarpradhan/StagAI-EURS-T1/releases/download/weights-v1/StagAI_EURS_T1_weights.tar.gz
+sha256: 435d54929348ebbeb774cd470c64ca4dd7f8ca8625b1b49faf846b3fb6ae4c35
+filename: StagAI_EURS_T1_weights.tar.gz
